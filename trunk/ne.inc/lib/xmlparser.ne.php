@@ -16,12 +16,11 @@
    > Date Started: 11th Auguest 2005
    > Date Edited: 11th Augest 2005
    > Version Number: 1.0.0
-   > Time Taken: 3 hours
+   > Time Taken: 5 hours
 */
 
 class xmlparser {
 	var $document;
-	var $dpos;
 	var $file;
 	var $parser;
 	var $tag;
@@ -52,29 +51,24 @@ class xmlparser {
 		$this->parser = xml_parser_create();
 		xml_set_object($this->parser, &$this);
 		xml_set_element_handler($this->parser, 'tag_open', 'tag_close');
-		xml_set_character_data_handler($this->parser, 'char_data');
+		xml_set_character_data_handler($this->parser, 'tag_data');
 		xml_set_processing_instruction_handler($this->parser, 'processing');
 		xml_parser_set_option($this->xml_parser, XML_OPTION_CASE_FOLDING, 0);
 		$this->parse();
 	}
 	// XML Tag Open Handler
 	function tag_open($parser, $tag, $attr) {
-		if(!isset($this->tag['children']['?'])) { $this->tag['children']['?'] = array(); }
 		if(!isset($this->tag['children'][$name])) { $this->tag['children'][$name] = array(); }
 
-		$lastchild = count($this->tag['children'][$name]);
-		$anonchild = count($this->tag['children']['?']);
+		$child = count($this->tag['children'][$name]) - 1;
 
-		$this->tag['children'][$name][$lastchild] = array(
-			'attribs'		=> $attr,
-			'children'		=> array('?' => array()),
+		$this->tag['children'][$name][$child] = array(
+			'attr'			=> $attr,
+			'children'		=> array(),
 			'parent'		=> &$this->tag,
 			'internal'		=> false,
 			'name'			=> $name,
-			'anon_index'	=> $anonchild,
-			'index'			=> $lastchild
 		);
-		$this->tag['children']['?'][$anonchild] = &$this->tag['children'][$name][$lastchild];
 		$this->tag = &$this->tag['children'][$name][$lastchild];
 	}
 	// XML Tag Close Handler
@@ -82,8 +76,8 @@ class xmlparser {
 		if(substr($this->xml, xml_get_current_byte_index($this->parser) - 2, 1) == '/') { $this->tag['internal'] = true; }
 		$this->tag = &$this->tag['parent'];
 	}
-	// Character Data Handler
-	function char_data($parser, $data) {
+	// Tag Data Handler
+	function tag_data($parser, $data) {
 		$this->tag['text'] .= $data;
 	}
 	// Processing Instruction Handler
@@ -102,27 +96,30 @@ class xmlparser {
 	// Compile XML
 	function compile() {
 		$this->xml = NULL;
-		$this->dpos = 0;
-		$this->tag = &$this->document;
 
 		$pikeys = array_keys($this->document['pi']);
-		foreach($pikeys as $key) {
-			$this->xml .= "<?{$key} ".$this->document['pi'][$key].'?>';
-			$this->dpos += strlen($key.$this->document['pi'][$key]) + 5;
-		}
+		foreach($pikeys as $key) { $this->xml .= "<?{$key} ".$this->document['pi'][$key].'?>'; }
 		unset($pikeys, $key);
 
-		$this->compile_tag(&$this->document['children']['?'][0]);
+		list($name) = array_keys($this->document['children']);
+		$this->compile_tag(&$this->document['children'][$name][0]);
 	}
 	// Compile XML Tag
-	function compile_tag(&$tag) {
-		if($this->dpost < strlen($this->xml)) {
-			if($tag['internal'] == false) { $this->xml = substr_replace($this->xml, '<'.$tag['name'].'></'.$tag['name'].'>', $this->dpos, 0); }
-			else { $this->xml = substr_replace($this->xml, '<'.$tag['name'].'/>', $this->dpos, 0); }
-		}
+	function compile_tag(&$tag, $indent = NULL) {
+		// Create Attributes if there are any
+		$attrs = NULL;
+		foreach($tag['attr'] as $key => $val) { $attrs .= " {$key}=\"{$val}\""; }
+
+		// Create the Tag
+		if($tag['internal'] == true) { $this->xml .= "\n{$indent}<".$tag['name'].$attrs.'/>'; }
 		else {
-			if($tag['internal'] == false) { $this->xml .= '<'.$tag['name'].'></'.$tag['name'].'>'; }
-			else { $this->xml .= '<'.$tag['name'].'/>'; }
+			$this->xml .= "\n{$indent}<".$tag['name'].$attrs'>';
+			if(isset($tag['text'])) { $this->xml .= $tag['text']; }
+			$names = array_keys($tag['children']);
+			foreach($names as $name)  {
+				foreach($tag['children'][$name] as &$ctag) { $this->compile_tag(&$ctag, $indend.'	'); }
+			}
+			$this->xml .= '</'.$tag['name'].">\n";
 		}
 	}
 }
