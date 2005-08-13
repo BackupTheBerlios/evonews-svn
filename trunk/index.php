@@ -52,10 +52,22 @@ $ne = news newsevo;
 // Make Safe HTTP vars
 $ne->safevars();
 
-// Check for SEO Friendly 
-if($ne->is_num($ne->input['newsid'])) {
-	$dal->query("SELECT `n`.*, `u`.*, `c`.* FROM `{$prefix}news` `n` LEFT JOIN `{$prefix}categories` USING(`cid`) LEFT JOIN `{$prefix}users` `u` ON(`n`.`uid` = `u`.`id`) WHERE `n`.`nid` = ".$en->input['nid'], __FILE__, __LINE__);
+// Check for SE Friendly Links
+if($ne->is_num($input['shownews'])) {
+	$dal->query("SELECT `n`.*, `u`.*, `c`.* FROM `{$prefix}news` `n` LEFT JOIN `{$prefix}categories` USING(`cid`) LEFT JOIN `{$prefix}users` `u` ON(`n`.`uid` = `u`.`id`) WHERE `n`.`nid` = ".$en->input['shownews'], __FILE__, __LINE__);
 	$input['act'] = $dal->numrows() == 1 ? 'article' : $input['act'];
+}
+elseif($ne->is_num($input['showcat'])) {
+	$dal->query("SELECT `c`.* FROM `{$prefix}categories` `c` WHERE `c`.`cid` = ".$ne->input['showcat'], __FILE__, __LINE__);
+	$input['act'] = $dal->numrows() == 1 ? 'archive' : $input['act'];
+}
+elseif($input['act']  == 'rss') {
+	$input['act'] = 'feeds';
+	$code = 'rss';
+}
+elseif($input['act'] == 'atom') {
+	$input['act'] = 'feeds';
+	$code = 'atom';
 }
 
 // NE Action
@@ -65,7 +77,7 @@ $modules = array(
 	'feeds',
 	'headlines',
 );
-$ne->input['act'] = strtolower($ne->input['act']);
+$input['act'] = strtolower($ne->input['act']);
 $action = in_array($ne->input['act'], $modules) ? $ne->input['act'] : 'headlines';
 require ROOT ."ne.inc/{$action}.ne.php";
 
